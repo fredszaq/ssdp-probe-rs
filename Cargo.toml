@@ -3,6 +3,13 @@ name = "ssdp-probe"
 version = "0.1.0"
 authors = ["Thibaut Lorrain <fredszaq@gmail.com>"]
 edition = "2018"
+license = "MIT OR Apache-2.0"
+description = "Simple rust crate to perform SSDP discovery"
+readme = "README.md"
+homepage = "https://github.com/fredszaq/ssdp-probe-rs"
+repository = "https://github.com/fredszaq/ssdp-probe-rs"
+keywords = ["upnp", "ssdp", "discovery"]
+categories = ["config"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
