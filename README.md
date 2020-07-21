@@ -4,7 +4,7 @@ A simple crate to perform SSDP discoveries
 
 ## Last version
 ```
-ssdp-probe = "0.1"
+ssdp-probe = "0.2"
 ```
 
 
