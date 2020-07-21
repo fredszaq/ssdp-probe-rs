@@ -25,14 +25,13 @@ pub fn ssdp_probe_v4(
         marker,
         max_results,
         max_duration,
-        br#"M-SEARCH * HTTP/1.1
-HOST: 239.255.255.250:1900
-MAN: "ssdp:discover"
-MX: 3
-ST: upnp:rootdevice
-
-"#,
         SocketAddr::new(IpAddr::from(Ipv4Addr::new(0, 0, 0, 0)), 1900),
+        SsdpMSearch {
+            host: SocketAddr::new(IpAddr::from(Ipv4Addr::new(239, 255, 255, 250)), 1900),
+            mx: 3,
+            st: "upnp:rootdevice",
+            extra_lines: "",
+        },
         SocketAddr::new(IpAddr::from(Ipv4Addr::new(239, 255, 255, 250)), 1900),
         Domain::ipv4(),
     )
@@ -56,14 +55,16 @@ pub fn ssdp_probe_v6(
         marker,
         max_results,
         max_duration,
-        br#"M-SEARCH * HTTP/1.1
-HOST: [FF02::C]:1900
-MAN: "ssdp:discover"
-MX: 3
-ST: upnp:rootdevice
-
-"#,
         SocketAddr::new(IpAddr::from(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0)), 1900),
+        SsdpMSearch {
+            host: SocketAddr::new(
+                IpAddr::from(Ipv6Addr::new(0xFF, 0x02, 0, 0, 0, 0, 0, 0xC)),
+                1900,
+            ),
+            mx: 3,
+            st: "upnp:rootdevice",
+            extra_lines: "",
+        },
         SocketAddr::new(
             IpAddr::from(Ipv6Addr::new(0xFF, 0x02, 0, 0, 0, 0, 0, 0xC)),
             1900,
@@ -81,12 +82,34 @@ ST: upnp:rootdevice
     })
 }
 
+pub struct SsdpMSearch<'a> {
+    pub host: SocketAddr,
+    pub mx: usize,
+    pub st: &'a str,
+    pub extra_lines: &'a str,
+impl<'a> SsdpMSearch<'a> {
+    pub fn get_payload(&self) -> Vec<u8> {
+        format!(
+            r#"M-SEARCH * HTTP/1.1
+HOST: {}
+MAN: "ssdp:discover"
+MX: {}
+ST: {}
+{}
+
+"#,
+            self.host, self.mx, self.st, self.extra_lines
+        )
+        .into_bytes()
+    }
+}
+
 pub fn ssdp_probe(
     marker: &[u8],
     max_results: usize,
     max_duration: Duration,
-    payload: &[u8],
-    bind_address: SocketAddr,
+    mut bind_address: SocketAddr,
+    mut m_search: SsdpMSearch,
     address: SocketAddr,
     domain: Domain,
 ) -> Result<Vec<IpAddr>, SsdpProbeError> {
@@ -101,11 +124,20 @@ pub fn ssdp_probe(
     socket.set_multicast_ttl_v4(4)?;
     socket.set_read_timeout(Some(Duration::from_millis(100)))?;
 
-    //receive responses from every address
-    socket.bind(&SockAddr2::from(bind_address))?;
+    let bind_result = socket.bind(&SockAddr2::from(bind_address));
 
-    //send ssdp packet to ssdp multicast address
-    socket.send_to(payload, &SockAddr2::from(address))?;
+    if let Err(e) = &bind_result {
+        if e.kind() == ErrorKind::AddrInUse {
+            bind_address.set_port(0);
+            socket.bind(&SockAddr2::from(bind_address))?;
+        } else {
+            bind_result?;
+        }
+    }
+
+    m_search.host.set_port(bind_address.port());
+
+    socket.send_to(&m_search.get_payload(), &SockAddr2::from(address))?;
 
     let mut result = vec![];
     let mut data = [0u8; 1024];
