@@ -4,6 +4,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::time::Duration;
 use thiserror::Error;
 
+/// An error that occurred during the SSDP discovery
 #[derive(Error, Debug)]
 pub enum SsdpProbeError {
     #[error("an IO error was encountered")]
@@ -16,6 +17,21 @@ pub enum SsdpProbeError {
     UnexpectedIpv6(Ipv6Addr),
 }
 
+/// Perform an UPnP SSDP discovery on IPv4.
+///
+/// This will use the standard address `239.255.255.250:1900`
+///
+/// # Arguments
+///  - `marker`: marker used to filter the results (if this is present in the received response,
+///  then the address will be returned
+///  - `max_results`: stop the discovery when the number of results is equal to this
+///  - `max_duration`: stop the discovery after this duration
+///
+/// # Returned Value
+/// A list of all the addresses that responded to the discovery with a response containing the
+/// sequence of bytes given in `marker`. Note that there will be no duplicates in the list.
+/// # See
+/// [`ssdp_probe_v6`](fn.ssdp_probe_v6.html)
 pub fn ssdp_probe_v4(
     marker: &[u8],
     max_results: usize,
@@ -46,6 +62,22 @@ pub fn ssdp_probe_v4(
     })
 }
 
+/// Perform an UPnP SSDP discovery on IPv6.
+///
+/// This will use the standard link-local address `[FF:02::C]:1900`
+///
+/// # Arguments
+///  - `marker`: marker used to filter the results (if this is present in the received response,
+///  then the address will be returned
+///  - `max_results`: stop the discovery when the number of results is equal to this
+///  - `max_duration`: stop the discovery after this duration
+///
+/// # Returned Value
+/// A list of all the addresses that responded to the discovery with a response containing the
+/// sequence of bytes given in `marker`. Note that there will be no duplicates in the list.
+///
+/// # See
+/// [`ssdp_probe_v4`](fn.ssdp_probe_v4.html)
 pub fn ssdp_probe_v6(
     marker: &[u8],
     max_results: usize,
@@ -82,12 +114,23 @@ pub fn ssdp_probe_v6(
     })
 }
 
+/// Representation of an M-SEARCH SSDP request
 pub struct SsdpMSearch<'a> {
+    /// Host (address to use to respond to the query)
     pub host: SocketAddr,
+    /// Max number of seconds to wait before sending response
     pub mx: usize,
+    /// Search Target, possible values include (non exhaustive list):
+    ///  - `ssdp:all`: search for all devices and services
+    ///  - `upnp:rootdevice`: search only for root devices
+    ///  - `uuid:<device-UUID>` search for a specific device using its UUID
     pub st: &'a str,
+    /// Extra lines appended to the M-SEARCH query
     pub extra_lines: &'a str,
+}
+
 impl<'a> SsdpMSearch<'a> {
+    /// Get a properly formatted SSDP M-SEARCH payload for this
     pub fn get_payload(&self) -> Vec<u8> {
         format!(
             r#"M-SEARCH * HTTP/1.1
@@ -104,6 +147,30 @@ ST: {}
     }
 }
 
+/// Perform an UPnP SSDP discovery, this is a "low level" method that is exposed if you wanna
+/// tweak some parameters, most use cases should be ok with the
+/// [`ssdp_probe_v4`](fn.ssdp_probe_v4.html) and [ssdp_probe_v6](fn.ssdp_probe_v6.html) functions.
+///
+/// # Arguments
+///  - `marker`: marker used to filter the results (if this is present in the received response,
+///  then the address will be returned
+///  - `max_results`: stop the discovery when the number of results is equal to this
+///  - `max_duration`: stop the discovery after this duration
+///  - `bind_address`: address to bind to receive the responses, note that the port may automatically
+///  be changed is one one provided is already in use, you should probably stick to the default ip
+///  and port reserved for SSDP
+///  - `m_search`: query to perform, note that the port in the host will be automatically changed to
+///  the one used by the `bind_address` (as is may be changed if the given one is not available)
+///  - `address`: address to send the search to, should be one one of the standard SSDP ones
+///  - `domain`: whether to use IPv4 or IPv6, should be coherent with the addresses passed in
+///  `address` and `m_search.host`
+///
+/// # Returned Value
+/// A list of all the addresses that responded to the discovery with a response containing the
+/// sequence of bytes given in `marker`. Note that there will be no duplicates in the list.
+///
+/// # See
+/// [SsdpMSearch](struct.SsdpMSearch.html)
 pub fn ssdp_probe(
     marker: &[u8],
     max_results: usize,
