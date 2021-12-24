@@ -90,7 +90,7 @@ pub fn ssdp_probe_v6(
         SocketAddr::new(IpAddr::from(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0)), 1900),
         SsdpMSearch {
             host: SocketAddr::new(
-                IpAddr::from(Ipv6Addr::new(0xFF, 0x02, 0, 0, 0, 0, 0, 0xC)),
+                IpAddr::from(Ipv6Addr::new(0xFF02, 0, 0, 0, 0, 0, 0, 0xC)),
                 1900,
             ),
             mx: 3,
@@ -98,7 +98,7 @@ pub fn ssdp_probe_v6(
             extra_lines: "",
         },
         SocketAddr::new(
-            IpAddr::from(Ipv6Addr::new(0xFF, 0x02, 0, 0, 0, 0, 0, 0xC)),
+            IpAddr::from(Ipv6Addr::new(0xFF02, 0, 0, 0, 0, 0, 0, 0xC)),
             1900,
         ),
         Domain::ipv6(),
@@ -143,6 +143,7 @@ ST: {}
 "#,
             self.host, self.mx, self.st, self.extra_lines
         )
+        .replace("\n", "\r\n")
         .into_bytes()
     }
 }
