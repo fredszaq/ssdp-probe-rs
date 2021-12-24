@@ -143,6 +143,7 @@ ST: {}
 "#,
             self.host, self.mx, self.st, self.extra_lines
         )
+        .replace("\n", "\r\n")
         .into_bytes()
     }
 }
